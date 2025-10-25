@@ -2,9 +2,9 @@
 let state = {
     uploadedFile: null,
     uploadedFilename: null,
-    selectedStyle: 'meme',
+    selectedStyles: ['meme'],
     selectedLanguage: 'en',
-    srtFilename: null
+    srtFilenames: []
 };
 
 // DOM elements
@@ -18,7 +18,7 @@ const changeFileBtn = document.getElementById('changeFileBtn');
 
 const styleSection = document.getElementById('styleSection');
 const styleCards = document.querySelectorAll('.style-card');
-const styleRadios = document.querySelectorAll('input[name="captionStyle"]');
+const styleChecks = document.querySelectorAll('input[name="captionStyle"]');
 
 const languageSection = document.getElementById('languageSection');
 const languageSelect = document.getElementById('languageSelect');
@@ -32,11 +32,7 @@ const progressTitle = document.getElementById('progressTitle');
 const progressText = document.getElementById('progressText');
 
 const resultsSection = document.getElementById('resultsSection');
-const totalCaptions = document.getElementById('totalCaptions');
-const selectedStyle = document.getElementById('selectedStyle');
-const selectedLanguage = document.getElementById('selectedLanguage');
 const previewList = document.getElementById('previewList');
-const downloadBtn = document.getElementById('downloadBtn');
 const newVideoBtn = document.getElementById('newVideoBtn');
 
 const errorSection = document.getElementById('errorSection');
@@ -54,36 +50,35 @@ uploadArea.addEventListener('dragover', (e) => {
     e.preventDefault();
     uploadArea.classList.add('drag-over');
 });
-
 uploadArea.addEventListener('dragleave', () => {
     uploadArea.classList.remove('drag-over');
 });
-
 uploadArea.addEventListener('drop', (e) => {
     e.preventDefault();
     uploadArea.classList.remove('drag-over');
-    
     const files = e.dataTransfer.files;
     if (files.length > 0) {
         handleFile(files[0]);
     }
 });
 
-// Style selection
+// Style selection (checkboxes)
 styleCards.forEach(card => {
-    card.addEventListener('click', () => {
-        const style = card.dataset.style;
-        const radio = card.querySelector('input[type="radio"]');
-        
-        // Update UI
-        styleCards.forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        radio.checked = true;
-        
-        // Update state
-        state.selectedStyle = style;
+    const cb = card.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', handleStyleSelection);
+    card.addEventListener('click', function(event) {
+        if (event.target !== cb) cb.checked = !cb.checked;
+        card.classList.toggle('selected');
+        handleStyleSelection();
     });
 });
+function handleStyleSelection() {
+    const checked = [];
+    styleChecks.forEach(cb => {
+        if (cb.checked) checked.push(cb.value);
+    });
+    state.selectedStyles = checked;
+}
 
 // Language selection
 languageSelect.addEventListener('change', (e) => {
@@ -93,55 +88,38 @@ languageSelect.addEventListener('change', (e) => {
 // Generate button
 generateBtn.addEventListener('click', processVideo);
 
-// Download button
-downloadBtn.addEventListener('click', downloadSRT);
-
 // New video button
 newVideoBtn.addEventListener('click', reset);
 
 // Retry button
 retryBtn.addEventListener('click', reset);
 
-// Functions
+// File select handlers
 function handleFileSelect(e) {
     const file = e.target.files[0];
-    if (file) {
-        handleFile(file);
-    }
+    if (file) handleFile(file);
 }
-
 function handleFile(file) {
-    // Validate file type
+    // Validate file type and size
     const validTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm'];
     if (!validTypes.includes(file.type)) {
         showError('Invalid file type. Please upload MP4, MOV, AVI, MKV, or WebM.');
         return;
     }
-    
-    // Validate file size (100MB)
     const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
         showError('File too large. Maximum size is 100MB.');
         return;
     }
-    
-    // Store file
     state.uploadedFile = file;
-    
-    // Update UI
     fileName.textContent = file.name;
     fileSize.textContent = formatFileSize(file.size);
     fileInfo.style.display = 'flex';
-    
-    // Show next sections
     styleSection.style.display = 'block';
     languageSection.style.display = 'block';
     actionSection.style.display = 'block';
-    
-    // Hide upload area
     uploadArea.style.display = 'none';
 }
-
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -150,66 +128,51 @@ function formatFileSize(bytes) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+// Main process
 async function processVideo() {
     try {
-        // Disable button
+        // Check at least one style selected
+        if (!state.selectedStyles || state.selectedStyles.length === 0) {
+            showError('Please select at least one caption style.');
+            return;
+        }
         generateBtn.disabled = true;
-        
-        // Hide previous sections
         actionSection.style.display = 'none';
         errorSection.style.display = 'none';
-        
-        // Show progress
         progressSection.style.display = 'block';
         updateProgress(0, 'Uploading video...');
-        
-        // Step 1: Upload video
+
+        // Upload video
         const formData = new FormData();
         formData.append('video', state.uploadedFile);
-        
-        const uploadResponse = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
+        const uploadResponse = await fetch('/upload', { method: 'POST', body: formData });
         if (!uploadResponse.ok) {
             const error = await uploadResponse.json();
             throw new Error(error.error || 'Upload failed');
         }
-        
         const uploadData = await uploadResponse.json();
         state.uploadedFilename = uploadData.filename;
-        
         updateProgress(33, 'Video uploaded. Processing...');
-        
-        // Step 2: Process video
+
+        // Multi-style process request
         const processResponse = await fetch('/process', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 filename: state.uploadedFilename,
-                style: state.selectedStyle,
+                styles: state.selectedStyles,       // Array of styles
                 language: state.selectedLanguage
             })
         });
-        
         if (!processResponse.ok) {
             const error = await processResponse.json();
             throw new Error(error.error || 'Processing failed');
         }
-        
         const processData = await processResponse.json();
-        state.srtFilename = processData.srt_filename;
-        
         updateProgress(100, 'Complete!');
-        
-        // Wait a moment then show results
         setTimeout(() => {
-            showResults(processData);
+            showMultiStyleResults(processData);
         }, 500);
-        
     } catch (error) {
         console.error('Error:', error);
         showError(error.message);
@@ -222,33 +185,36 @@ function updateProgress(percent, text) {
     progressText.textContent = text;
 }
 
-function showResults(data) {
-    // Hide progress
+// Show multi-style preview
+function showMultiStyleResults(data) {
     progressSection.style.display = 'none';
-    
-    // Update results data
-    totalCaptions.textContent = data.total_captions;
-    selectedStyle.textContent = state.selectedStyle.charAt(0).toUpperCase() + state.selectedStyle.slice(1);
-    selectedLanguage.textContent = languageSelect.options[languageSelect.selectedIndex].text;
-    
-    // Show preview
     previewList.innerHTML = '';
-    const previewCaptions = data.captions.slice(0, 5);
-    previewCaptions.forEach((caption, index) => {
-        const item = document.createElement('div');
-        item.className = 'preview-item';
-        item.textContent = `${index + 1}. ${caption.text}`;
-        previewList.appendChild(item);
-    });
-    
-    // Show results section
-    resultsSection.style.display = 'block';
-}
-
-function downloadSRT() {
-    if (state.srtFilename) {
-        window.location.href = `/download/${state.srtFilename}`;
+    if (data.results && data.results.length > 0) {
+        data.results.forEach((result, i) => {
+            const title = document.createElement('h4');
+            title.textContent = `Style: ${capitalize(result.style)}`;
+            previewList.appendChild(title);
+            (result.captions.slice(0, 5)).forEach((caption, idx) => {
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+                item.textContent = `${idx + 1}. ${caption.text}`;
+                previewList.appendChild(item);
+            });
+            // Download SRT button
+            const download = document.createElement('button');
+            download.className = 'btn btn--primary btn--sm';
+            download.textContent = `Download SRT (${result.style})`;
+            download.addEventListener('click', () => {
+                window.location.href = `/download/${result.srt_filename}`;
+            });
+            previewList.appendChild(download);
+            if (i < data.results.length - 1) {
+                const hr = document.createElement('hr');
+                previewList.appendChild(hr);
+            }
+        });
     }
+    resultsSection.style.display = 'block';
 }
 
 function showError(message) {
@@ -259,16 +225,13 @@ function showError(message) {
 }
 
 function reset() {
-    // Reset state
     state = {
         uploadedFile: null,
         uploadedFilename: null,
-        selectedStyle: 'meme',
+        selectedStyles: ['meme'],
         selectedLanguage: 'en',
-        srtFilename: null
+        srtFilenames: []
     };
-    
-    // Reset UI
     videoInput.value = '';
     fileInfo.style.display = 'none';
     uploadArea.style.display = 'block';
@@ -278,14 +241,19 @@ function reset() {
     progressSection.style.display = 'none';
     resultsSection.style.display = 'none';
     errorSection.style.display = 'none';
-    
     generateBtn.disabled = false;
-    
+
     // Reset style selection
     styleCards.forEach(card => card.classList.remove('selected'));
-    styleCards[0].classList.add('selected');
-    styleRadios[0].checked = true;
-    
-    // Reset language
+    styleChecks.forEach((cb, idx) => {
+        cb.checked = (cb.value === 'meme');
+        if (cb.value === 'meme') styleCards[idx].classList.add('selected');
+    });
+
     languageSelect.value = 'en';
+}
+
+function capitalize(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }

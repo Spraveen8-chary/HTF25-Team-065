@@ -73,6 +73,9 @@ def register():
 def login():
     """User login"""
     if current_user.is_authenticated:
+        # Redirect admin users to admin dashboard
+        if getattr(current_user, 'is_admin', False):
+            return redirect(url_for('admin_dashboard'))
         return redirect(url_for('index'))
     
     if request.method == 'POST':
@@ -91,11 +94,16 @@ def login():
                     'success': True,
                     'message': 'Login successful',
                     'username': user.username,
+                    'is_admin': getattr(user, 'is_admin', False),
+                    'redirect_url': '/admin' if getattr(user, 'is_admin', False) else '/',
                     'videos_processed': user.get_video_count(),
                     'can_process': user.can_process_video()
                 }), 200
             
             flash(f'Welcome back, {user.username}!', 'success')
+            # Redirect admin to admin dashboard
+            if getattr(user, 'is_admin', False):
+                return redirect(url_for('admin_dashboard'))
             return redirect(url_for('index'))
         
         error_message = 'Invalid email or password'

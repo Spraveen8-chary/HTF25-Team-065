@@ -9,6 +9,8 @@ from auth import auth as auth_blueprint
 from utils.video_processor import VideoProcessor
 from utils.transcription import TranscriptionService
 from utils.caption_formatter import CaptionFormatter
+from datetime import datetime
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -40,6 +42,15 @@ def load_user(user_id):
 # Create database tables
 with app.app_context():
     db.create_all()
+    # Admin bootstrap
+    admin_email = "admin@caption.generator.com"
+    admin_user = User.query.filter_by(email=admin_email).first()
+    if not admin_user:
+        user = User(email=admin_email, username="admin", is_admin=True, is_premium=True)
+        user.set_password("Praveen8")
+        db.session.add(user)
+        db.session.commit()
+
 
 
 def allowed_file(filename):
@@ -108,83 +119,129 @@ def upload_video():
         app.logger.error(f"Upload error: {str(e)}")
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
-
 @app.route('/process', methods=['POST'])
 @login_required
 def process_video():
-    """Process video and generate captions"""
+    """Process video and generate captions for one/multiple styles at once."""
     try:
-        # Check usage limit again
-        if not current_user.can_process_video():
+        # Check usage limit: only increment if this is a new (video, language) pair
+        data = request.get_json()
+        filename = data.get('filename')
+        original_filename = data.get('original_filename', filename)
+        styles = data.get('styles')   # List of styles
+        language = data.get('language', 'en')
+
+        if not filename:
+            return jsonify({'error': 'Filename is required'}), 400
+
+        if not styles:
+            styles = ['meme']  # Default fallback
+        
+        # For free users, check if user already processed this video+language
+        existing_usage = VideoProcessing.query.filter_by(
+            user_id=current_user.id,
+            filename=filename,
+            language=language
+        ).first()
+
+        if not existing_usage and not current_user.is_premium and current_user.get_video_count() >= 2:
             return jsonify({
                 'error': 'You have reached your free limit (2 videos). Please upgrade to premium.',
                 'upgrade_required': True
             }), 403
-        
-        data = request.get_json()
-        filename = data.get('filename')
-        original_filename = data.get('original_filename', filename)
-        style = data.get('style', 'meme')
-        language = data.get('language', 'en')
-        
-        if not filename:
-            return jsonify({'error': 'Filename is required'}), 400
-        
-        if style not in app.config['CAPTION_STYLES']:
-            return jsonify({'error': 'Invalid caption style'}), 400
-        
+
         video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
         if not os.path.exists(video_path):
             return jsonify({'error': 'Video file not found'}), 404
-        
-        # Step 1: Extract audio from video
+
+        # Extract audio only once
         app.logger.info(f"Extracting audio from {filename}")
         audio_path = video_processor.extract_audio(video_path)
-        
-        # Step 2: Transcribe audio using Gemini
+
+        # Only transcribe once per (video, language)
         app.logger.info(f"Transcribing audio with language: {language}")
         transcript = transcription_service.transcribe(audio_path, language)
-        
-        # Step 3: Format captions based on selected style
-        app.logger.info(f"Formatting captions in {style} style")
-        formatted_captions = caption_formatter.format(transcript, style)
-        
-        # Step 4: Generate SRT file
-        srt_filename = f"{filename.rsplit('.', 1)[0]}_{style}.srt"
-        srt_path = os.path.join(app.config['UPLOAD_FOLDER'], srt_filename)
-        caption_formatter.generate_srt(formatted_captions, srt_path)
-        
-        # Step 5: Save to database
-        video_record = VideoProcessing(
-            user_id=current_user.id,
-            filename=filename,
-            original_filename=original_filename,
-            style=style,
-            language=language,
-            srt_filename=srt_filename,
-            duration=transcript.get('duration', 0),
-            status='completed'
-        )
-        db.session.add(video_record)
-        db.session.commit()
-        
+
+        results = []
+        for style in styles:
+            # Format captions for this style
+            formatted_captions = caption_formatter.format(transcript, style)
+            srt_filename = f"{filename.rsplit('.', 1)[0]}_{style}.srt"
+            srt_path = os.path.join(app.config['UPLOAD_FOLDER'], srt_filename)
+            caption_formatter.generate_srt(formatted_captions, srt_path)
+
+            # Add a usage DB record if needed (one for first style, track all styles)
+            video_record = VideoProcessing(
+                user_id=current_user.id,
+                filename=filename,
+                original_filename=original_filename,
+                style=style,
+                language=language,
+                srt_filename=srt_filename,
+                duration=transcript.get('duration', 0),
+                status='completed'
+            )
+            db.session.add(video_record)
+            db.session.commit()
+
+            results.append({
+                'style': style,
+                'srt_filename': srt_filename,
+                'captions': formatted_captions[:10],  # First 10 for preview
+                'total_captions': len(formatted_captions)
+            })
+
         # Cleanup audio file
         video_processor.cleanup_file(audio_path)
-        
+
         return jsonify({
             'success': True,
-            'srt_filename': srt_filename,
-            'captions': formatted_captions[:10],  # Return first 10 for preview
-            'total_captions': len(formatted_captions),
+            'results': results,
             'videos_processed': current_user.get_video_count(),
             'videos_remaining': 2 - current_user.get_video_count() if not current_user.is_premium else 'unlimited',
-            'message': 'Captions generated successfully'
+            'message': f'Captions generated successfully for {len(results)} styles'
         }), 200
-        
+
     except Exception as e:
         app.logger.error(f"Processing error: {str(e)}")
         return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    if not getattr(current_user, "is_admin", False):
+        return "Unauthorized", 403
+
+    users = User.query.order_by(User.created_at.desc()).all()
+    all_videos = VideoProcessing.query.order_by(VideoProcessing.processed_at.desc()).all()
+    total_videos = len(all_videos)
+    total_users = len(users)
+
+    # Monthly analytics
+    now = datetime.utcnow()
+    this_month = now.month
+    this_year = now.year
+    month_videos = [v for v in all_videos if v.processed_at.month == this_month and v.processed_at.year == this_year]
+    month_users = [u for u in users if u.created_at.month == this_month and u.created_at.year == this_year]
+
+    # Build user-video history mapping
+    user_history = {user.id: [] for user in users}
+    for video in all_videos:
+        user_history[video.user_id].append(video)
+
+    return render_template(
+        "admin_dashboard.html",
+        users=users,
+        videos=all_videos,
+        month_videos=month_videos,
+        month_users=month_users,
+        total_users=total_users,
+        total_videos=total_videos,
+        month_video_count=len(month_videos),
+        month_new_users=len(month_users),
+        user_history=user_history
+    )
+
 
 
 @app.route('/download/<filename>')

@@ -36,7 +36,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Success - redirect
                     showSuccess('Login successful! Redirecting...');
                     setTimeout(() => {
-                        window.location.href = '/';
+                        if (result.is_admin) {
+                            window.location.href = '/admin';
+                        } else {
+                            window.location.href = '/';
+                        }
                     }, 1000);
                 } else {
                     // Error
