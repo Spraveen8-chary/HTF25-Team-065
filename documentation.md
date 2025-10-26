@@ -19,8 +19,23 @@ Effortlessly add accurate, AI-powered captions to your videos in 40+ languages. 
 ***
 
 ## 📸 Output Screenshots
+1. Register Page
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/632c23fb-798d-41c6-95c2-d7aeab447a40" />
+2. Login Page
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/88788f44-73e2-47ff-8538-f1843476e511" />
+3. Home Page
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/dd0f0b68-5067-4f7b-b89d-bdf30f585382" />
+4. Options
+   ![WhatsApp Image 2025-10-25 at 21 31 55_b599a96b](https://github.com/user-attachments/assets/1b300995-a7fe-4bd7-99d9-edc03a620d29)
+5. Results
+   ![WhatsApp Image 2025-10-25 at 21 32 43_3b868f6c](https://github.com/user-attachments/assets/58663f34-8c68-4e56-8e38-079e5229099f)
+6. Exporting
+   ![WhatsApp Image 2025-10-25 at 21 33 15_1d50342d](https://github.com/user-attachments/assets/e962607d-141d-48e6-8397-acfc57d5e3bd)
+7. Reaching Subscription Limit
+   ![WhatsApp Image 2025-10-25 at 21 39 57_d8d21ffc](https://github.com/user-attachments/assets/2d6f91c4-6104-4ff3-9381-ccec2419c90f)
 
-<!-- Add usage screenshots and the admin dashboard here as needed -->
+
+
 
 ***
 
