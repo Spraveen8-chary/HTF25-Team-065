@@ -32,7 +32,17 @@ Effortlessly add accurate, AI-powered captions to your videos in 40+ languages. 
 6. Exporting
    ![WhatsApp Image 2025-10-25 at 21 33 15_1d50342d](https://github.com/user-attachments/assets/e962607d-141d-48e6-8397-acfc57d5e3bd)
 7. Reaching Subscription Limit
-   ![WhatsApp Image 2025-10-25 at 21 39 57_d8d21ffc](https://github.com/user-attachments/assets/2d6f91c4-6104-4ff3-9381-ccec2419c90f)
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f59e588d-bd02-4424-96be-cda1201790ab" />
+8. History
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/3e237d86-8124-4eeb-b43e-f9edf58c77b7" />
+
+9. Admin Dashboard
+    <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/5a4541ba-c1aa-43d2-a474-02cf3652cec8" />
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/97f9f315-df51-4626-a29c-72db1ba5dbe3" />
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f09bf45a-111c-46ee-8f39-8ba12ce47a00" />
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/6395b3b7-5463-475a-9252-ca4a7bb5ae7e" />
+
+
 
 
 
