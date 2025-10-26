@@ -18,7 +18,7 @@ Effortlessly add accurate, AI-powered captions to your videos in 40+ languages. 
 
 ***
 
-## 📸 Screenshots
+## 📸 Output Screenshots
 
 <!-- Add usage screenshots and the admin dashboard here as needed -->
 
